@@ -5,6 +5,8 @@ POST_TITLE=$(gh issue view ${NUMBER} | grep "title:" | head -1 | sed 's|^title:|
 POST_LINK=$(echo "${POST_TITLE}" | sed 's| |%20|g')
 POST_TITLE_UPPER=$(echo "${POST_TITLE}" | tr '[:lower:]' '[:upper:]')
 
+[ ! "${1}" = "" ] && POST_TITLE_UPPER="${1}"
+
 SITE_TITLE=$(grep "title_prefix:" _config.yml | cut -c 15-)
 [ "${SITE_TITLE}" = "" ] && SITE_TITLE="My awesome website"
 
@@ -184,6 +186,8 @@ function build_structure() {
   }
 }
 
+date +%s > _timestamp
+
 function process_page_marks() {
   while IFS="" read -r line || [ -n "${line}" ]; do
     echo "${line}" | grep -q "^{.*}" && {
@@ -191,10 +195,10 @@ function process_page_marks() {
       [ -d "posts/${DIR}" ] && {
         echo
         echo "<table>"
-        posts=$(ls "posts/${DIR}"/*.md | sed 's|\.md$||g' | sort | tr -d '\r')
+        posts=$(ls "posts/${DIR}"/*.md  | grep -v "/_" | sed 's|\.md$||g' | sort | tr -d '\r')
         
         while IFS= read -r post; do
-          link=$(echo "${post}" | sed 's| |%20|g;s|posts/||g;s|^@||g')
+          link=$(echo "${post}" | sed 's| |%20|g;s|posts/||g')
           post=$(basename "${post}")
           echo -n '<tr><td>'
           echo "<a href=\"posts/${link}\">📄 ${post}</a>"
@@ -206,6 +210,18 @@ function process_page_marks() {
         continue;
       }
     }
+
+    line_lower=$(echo "${line}"  | tr '[:upper:]' '[:lower:]' | tr -d '\r'  | tr -d ' ')
+      
+    echo -e "^${line_lower}$" > /dev/stderr
+      
+    [ "${line_lower}" = ":recents:" ] && {
+      echo
+      cat _recents.txt
+      echo
+      continue;
+    }
+
     printf '%s\n' "${line}"
   done < "${1}"
 }
@@ -301,7 +317,7 @@ function build_category_page(){
       cat "_special/category_header.md" | sed "s|\${CATEGORY}|${category}|g"
     ) > "${category_dir}.md"
 
-    posts=$(ls "${category_dir}"/*.md | sed 's|\.md$||g' | sort | grep -v "/_")
+    posts=$(ls "${category_dir}"/*.md | sed 's|\.md$||g' | sort -V | grep -v "/_")
 
     while IFS= read -r post; do
       link=$(echo "${post}" | sed 's| |%20|g;s|posts/||g;s|^@||g')
